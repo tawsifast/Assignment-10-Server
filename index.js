@@ -23,6 +23,7 @@ async function run() {
     const db = client.db("assignment-10");
     const userCollection = db.collection("user");
     const propertyCollection = db.collection("properties");
+    const favouriteCollection = db.collection("favourites");
 
     // ALL THE API IS HERE
 
@@ -34,48 +35,60 @@ async function run() {
     });
 
     app.get("/properties/:id", async (req, res) => {
-      const {id} = req.params;
-      const query = {_id: new ObjectId(id)}
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
       const result = await propertyCollection.findOne(query);
       res.json(result);
     });
 
-    app.post("/properties", async(req, res)=>{
-        const property = req.body;
-        const newProperty = {
-            ...property,
-            createdAt: new Date()
-        }
-        const result = await propertyCollection.insertOne(newProperty);
-        res.json(result)
-    })
-
-    app.get("/my/properties", async(req, res)=>{
-        let query = {};
-        if(req.query.ownerId){
-            query.ownerId = req.query.ownerId
-        }
-        const result = await propertyCollection.find(query).toArray();
-        res.json(result || {});
+    app.post("/properties", async (req, res) => {
+      const property = req.body;
+      const newProperty = {
+        ...property,
+        createdAt: new Date(),
+      };
+      const result = await propertyCollection.insertOne(newProperty);
+      res.json(result);
     });
 
-    app.patch("/my/properties/:propertyId", async(req, res)=>{
-        const {propertyId} = req.params;
-        const newlyUpdatedData = req.body;
-        const result = await propertyCollection.updateOne(
-        {_id: new ObjectId(propertyId)},
-        {$set : newlyUpdatedData}
-        );
-        console.log(newlyUpdatedData);
-        res.json(result);
+    app.get("/my/properties", async (req, res) => {
+      let query = {};
+      if (req.query.ownerId) {
+        query.ownerId = req.query.ownerId;
+      }
+      const result = await propertyCollection.find(query).toArray();
+      res.json(result || {});
     });
 
+    app.patch("/my/properties/:propertyId", async (req, res) => {
+      const { propertyId } = req.params;
+      const newlyUpdatedData = req.body;
+      const result = await propertyCollection.updateOne(
+        { _id: new ObjectId(propertyId) },
+        { $set: newlyUpdatedData },
+      );
+      console.log(newlyUpdatedData);
+      res.json(result);
+    });
 
+    // FAVOURITE API
+    app.post("/favourites", async (req, res) => {
+      const favouriteData = req.body;
+      const favorite = {
+        ...favouriteData,
+        createdAt: new Date(),
+      };
+      const result = await favouriteCollection.insertOne(favorite);
+      res.json(result);
+    });
 
+    app.get("/favourites/:email", async (req, res) => {
+      const result = await favouriteCollection.find({ userEmail: req.params.email }).toArray();
+      res.json(result);
+    });
 
     // USER RELATED API
     app.get("/users", async (req, res) => {
-
       const cursor = userCollection.find();
       const result = await cursor.toArray();
 
