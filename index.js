@@ -59,14 +59,15 @@ async function run() {
         res.json(result || {});
     });
 
-    app.get("/my/properties/:id", async(req, res)=>{
-        const {id} = req.params;
+    app.patch("/my/properties/:propertyId", async(req, res)=>{
+        const {propertyId} = req.params;
         const newlyUpdatedData = req.body;
-        const filter = {_id: new ObjectId(id)}
-        const updatedResult = await propertyCollection.updateOne(
-        {_id: new ObjectId(id)},
-        {$set: newlyUpdatedData}
-    );
+        const result = await propertyCollection.updateOne(
+        {_id: new ObjectId(propertyId)},
+        {$set : newlyUpdatedData}
+        );
+        console.log(newlyUpdatedData);
+        res.json(result);
     });
 
 
