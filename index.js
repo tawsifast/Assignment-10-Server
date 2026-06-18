@@ -22,11 +22,58 @@ async function run() {
     await client.connect();
     const db = client.db("assignment-10");
     const userCollection = db.collection("user");
+    const propertyCollection = db.collection("properties");
 
     // ALL THE API IS HERE
 
+    // PROPERTIES RELATED API
+    app.get("/properties", async (req, res) => {
+      const cursor = propertyCollection.find();
+      const result = await cursor.toArray();
+      res.json(result);
+    });
+
+    app.get("/properties/:id", async (req, res) => {
+      const {id} = req.params;
+      const query = {_id: new ObjectId(id)}
+      const result = await propertyCollection.findOne(query);
+      res.json(result);
+    });
+
+    app.post("/properties", async(req, res)=>{
+        const property = req.body;
+        const newProperty = {
+            ...property,
+            createdAt: new Date()
+        }
+        const result = await propertyCollection.insertOne(newProperty);
+        res.json(result)
+    })
+
+    app.get("/my/properties", async(req, res)=>{
+        let query = {};
+        if(req.query.ownerId){
+            query.ownerId = req.query.ownerId
+        }
+        const result = await propertyCollection.find(query).toArray();
+        res.json(result || {});
+    });
+
+    app.get("/my/properties/:id", async(req, res)=>{
+        const {id} = req.params;
+        const newlyUpdatedData = req.body;
+        const filter = {_id: new ObjectId(id)}
+        const updatedResult = await propertyCollection.updateOne(
+        {_id: new ObjectId(id)},
+        {$set: newlyUpdatedData}
+    );
+    });
+
+
+
+
+    // USER RELATED API
     app.get("/users", async (req, res) => {
-      console.log("api hit");
 
       const cursor = userCollection.find();
       const result = await cursor.toArray();
