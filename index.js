@@ -24,6 +24,7 @@ async function run() {
     const userCollection = db.collection("user");
     const propertyCollection = db.collection("properties");
     const favouriteCollection = db.collection("favourites");
+    const bookingCollection = db.collection("bookings");
 
     // ALL THE API IS HERE
 
@@ -83,8 +84,17 @@ async function run() {
     });
 
     app.get("/favourites/:email", async (req, res) => {
-      const result = await favouriteCollection.find({ userEmail: req.params.email }).toArray();
+      const result = await favouriteCollection
+        .find({ userEmail: req.params.email })
+        .toArray();
       res.json(result);
+    });
+
+    // BOKING RELATED API
+    app.post("/bookings", async (req, res) => {
+      const bookingData = req.body;
+      const result = await bookingCollection.insertOne(bookingData);
+      res.send(result);
     });
 
     // USER RELATED API
