@@ -90,10 +90,34 @@ async function run() {
       res.json(result);
     });
 
+    app.delete("/favourites/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await favouriteCollection.deleteOne({_id: new ObjectId(id),});
+      res.json(result);
+    });
+
     // BOKING RELATED API
     app.post("/bookings", async (req, res) => {
       const bookingData = req.body;
       const result = await bookingCollection.insertOne(bookingData);
+      res.send(result);
+    });
+
+    app.get("/bookings", async (req, res) => {
+      let query = {};
+      if (req.query.userEmail) {
+        query.email = req.query.userEmail;
+      }
+      const result = await bookingCollection.find(query).toArray();
+      res.json(result);
+    });
+
+    app.patch("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await bookingCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { paymentStatus: "paid" } },
+      );
       res.send(result);
     });
 
