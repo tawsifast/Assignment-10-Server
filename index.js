@@ -25,10 +25,11 @@ async function run() {
     const propertyCollection = db.collection("properties");
     const favouriteCollection = db.collection("favourites");
     const bookingCollection = db.collection("bookings");
+    const ownerBookingCollection = db.collection("ownerBookings");
 
     // ALL THE API IS HERE
 
-    // PROPERTIES RELATED API
+    // OWNER PROPERTIES RELATED API
     app.get("/properties", async (req, res) => {
       const cursor = propertyCollection.find();
       const result = await cursor.toArray();
@@ -72,6 +73,14 @@ async function run() {
       res.json(result);
     });
 
+    app.delete("/my/properties/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await propertyCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.json(result);
+    });
+
     // FAVOURITE API
     app.post("/favourites", async (req, res) => {
       const favouriteData = req.body;
@@ -92,7 +101,9 @@ async function run() {
 
     app.delete("/favourites/:id", async (req, res) => {
       const { id } = req.params;
-      const result = await favouriteCollection.deleteOne({_id: new ObjectId(id),});
+      const result = await favouriteCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.json(result);
     });
 
@@ -119,6 +130,38 @@ async function run() {
         { $set: { paymentStatus: "paid" } },
       );
       res.send(result);
+    });
+
+    app.patch("/owner/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedBooking = req.body;
+      const filter =  { _id: new ObjectId(id) }
+      const newlyBookingData = {
+            $set : {
+               bookingStatus: updatedBooking.bookingStatus
+            },
+            }
+      const result = await bookingCollection.updateOne(filter, newlyBookingData);
+      console.log(result,"rslt");
+      res.json(result);
+      
+    });
+
+    // OWNER BOOKING
+    app.get("/owner/bookings", async (req, res) => {
+      let query = {};
+      if (req.query.ownerEmail) {
+        query.ownerEmail = req.query.ownerEmail;
+      }
+      const result = await bookingCollection.find(query).toArray();
+      res.json(result);
+    });
+
+     app.get("/allBookings", async (req, res) => {
+      const cursor = bookingCollection.find();
+      const result = await cursor.toArray();
+      console.log(result);
+      res.json(result);
     });
 
     // USER RELATED API
