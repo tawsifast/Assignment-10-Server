@@ -26,6 +26,7 @@ async function run() {
     const favouriteCollection = db.collection("favourites");
     const bookingCollection = db.collection("bookings");
     const ownerBookingCollection = db.collection("ownerBookings");
+    const transactionCollection = db.collection("transactions");
 
     // ALL THE API IS HERE
 
@@ -70,6 +71,19 @@ async function run() {
         { $set: newlyUpdatedData },
       );
       console.log(newlyUpdatedData);
+      res.json(result);
+    });
+
+    app.patch("/adminProperty/:id", async (req, res) => {
+      const id = req.params.id;
+      const changedProperty = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatdProperty = {
+        $set: {
+          status: changedProperty.status,
+        },
+      };
+      const result = await propertyCollection.updateOne(filter, updatdProperty);
       res.json(result);
     });
 
@@ -135,16 +149,18 @@ async function run() {
     app.patch("/owner/bookings/:id", async (req, res) => {
       const id = req.params.id;
       const updatedBooking = req.body;
-      const filter =  { _id: new ObjectId(id) }
+      const filter = { _id: new ObjectId(id) };
       const newlyBookingData = {
-            $set : {
-               bookingStatus: updatedBooking.bookingStatus
-            },
-            }
-      const result = await bookingCollection.updateOne(filter, newlyBookingData);
-      console.log(result,"rslt");
+        $set: {
+          bookingStatus: updatedBooking.bookingStatus,
+        },
+      };
+      const result = await bookingCollection.updateOne(
+        filter,
+        newlyBookingData,
+      );
+      console.log(result, "rslt");
       res.json(result);
-      
     });
 
     // OWNER BOOKING
@@ -157,11 +173,23 @@ async function run() {
       res.json(result);
     });
 
-     app.get("/allBookings", async (req, res) => {
+    app.get("/allBookings", async (req, res) => {
       const cursor = bookingCollection.find();
       const result = await cursor.toArray();
       console.log(result);
       res.json(result);
+    });
+
+    // TRANSACTIONS API
+    app.post("/transactions", async (req, res) => {
+      const transaction = req.body;
+      const result = await transactionCollection.insertOne(transaction);
+      res.json(result);
+    });
+
+    app.get("/transactions", async (req, res) => {
+      const transactions = await transactionCollection.find().sort({ transactionDate: -1 }).toArray();
+      res.json(transactions);
     });
 
     // USER RELATED API
