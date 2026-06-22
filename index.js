@@ -3,6 +3,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { createRemoteJWKSet } = require("jose-cjs");
 const app = express();
 const port = process.env.PORT || 5000;
 app.use(cors());
@@ -17,6 +18,68 @@ const client = new MongoClient(uri, {
   },
 });
 
+// const JWKS = createRemoteJWKSet(
+//   new url(`${process.env.CLIENT_URL}/api/auth/jwks`),
+// );
+
+// const verifyToken = async (req, res, next) => {
+//   const autheader = req.headers.authorization;
+
+//   if (!autheader || autheader.startWith("Bearer")) {
+//     return res.status(401).json({message: "Unauthorized"})
+//   }
+//   const token = autheader.split(" ")[1];
+//   if(!token){
+//     return res.status(401).json({message: "Unauthorized"})
+//   }
+
+//   try{
+//     const {payload} = await jwtVerify(token, JWKS);
+//     req.user = payload
+//     console.log(payload,"payload");
+//     next()
+//   }catch(error){
+
+//   }
+// };
+
+// const ownerVerify = async(req, res, next) =>{
+//   const user = req.user;
+//   if(user?.role !== "owner"){
+//     return res.status(403).json({message: "Forbidden"})
+//   }
+//   next()
+// }
+// const tenantVerify = async(req, res, next) =>{
+//   const user = req.user;
+//   if(user?.role !== "tenant"){
+//     return res.status(403).json({message: "Forbidden"})
+//   }
+//   next()
+// }
+// const adminVerify = async(req, res, next) =>{
+//   const user = req.user;
+//   if(user?.role !== "admin"){
+//     return res.status(403).json({message: "Forbidden"})
+//   }
+//   next()
+// }
+
+const verifyToken = async (req, res, next) => {
+  console.log("headers", req.headers);
+  const autheader = req.headers.authorization;
+
+  if (!autheader || !autheader.startWith("Bearer")) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const token = autheader.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  next();
+};
+
 async function run() {
   try {
     await client.connect();
@@ -27,10 +90,70 @@ async function run() {
     const bookingCollection = db.collection("bookings");
     const ownerBookingCollection = db.collection("ownerBookings");
     const transactionCollection = db.collection("transactions");
+    const sessionCollection = db.collection("session");
 
+    const verifyToken = async (req, res, next) => {
+      console.log("headers", req.headers);
+      const autheader = req.headers.authorization;
+
+      if (!autheader || !autheader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Unauthorized: Missing or Invalid Token Format" });
+      }
+
+      const token = autheader.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Unauthorized: Token missing" });
+      }
+
+      try {
+        const query = { token : token };
+        const session = await sessionCollection.findOne(query);
+        if (!session) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+      
+        const userId = session?.userId;
+  
+        const userQuery = {_id: userId,};
+        const user = await userCollection.findOne(userQuery);
+      
+        if (!user) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+      
+        req.user = user;
+
+        next();
+      } catch (error) {
+        console.error("Token verification error:", error);
+        return res.status(500).json({ message: "Internal Server Error during verification" });
+      }
+    };
+
+    const verifyOwner = async (req, res, next) => {
+      const user = req.user;
+      if (user?.role !== "owner") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      next();
+    };
+    const verifyTenant = async (req, res, next) => {
+      const user = req.user;
+      if (user?.role !== "tenant") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      next();
+    };
+    const verifyAdmin = async (req, res, next) => {
+      const user = req.user;
+      if (user?.role !== "admin") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      next();
+    };
     // ALL THE API IS HERE
 
-    // OWNER PROPERTIES RELATED API
+    // public api 
     app.get("/properties", async (req, res) => {
       const { search, type, order } = req.query;
 
@@ -55,6 +178,7 @@ async function run() {
       res.json(result);
     });
 
+    // public property details
     app.get("/properties/:id", async (req, res) => {
       const { id } = req.params;
       const query = { _id: new ObjectId(id) };
@@ -62,7 +186,8 @@ async function run() {
       res.json(result);
     });
 
-    app.post("/properties", async (req, res) => {
+    // property post by owner
+    app.post("/properties", verifyToken, verifyOwner, async (req, res) => {
       const property = req.body;
       const newProperty = {
         ...property,
@@ -72,7 +197,8 @@ async function run() {
       res.json(result);
     });
 
-    app.get("/my/properties", async (req, res) => {
+    // porperty api for specific owner
+    app.get("/my/properties", verifyToken, verifyOwner, async (req, res) => {
       let query = {};
       if (req.query.ownerId) {
         query.ownerId = req.query.ownerId;
@@ -81,18 +207,19 @@ async function run() {
       res.json(result || {});
     });
 
-    app.patch("/my/properties/:propertyId", async (req, res) => {
-      const { propertyId } = req.params;
-      const newlyUpdatedData = req.body;
-      const result = await propertyCollection.updateOne(
-        { _id: new ObjectId(propertyId) },
-        { $set: newlyUpdatedData },
-      );
-      console.log(newlyUpdatedData);
-      res.json(result);
-    });
 
-    app.patch("/adminProperty/:id", async (req, res) => {
+    app.patch("/my/properties/:propertyId", verifyToken, verifyOwner, async (req, res) => {
+    const { propertyId } = req.params;
+    const { _id, ...newlyUpdatedData } = req.body; 
+    const result = await propertyCollection.updateOne(
+      { _id: new ObjectId(propertyId) },
+      { $set: newlyUpdatedData },
+    );
+    res.json(result);
+});
+
+    // admin can approve and reject property
+    app.patch("/adminProperty/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const changedProperty = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -109,7 +236,8 @@ async function run() {
       res.json(result);
     });
 
-    app.delete("/my/properties/:id", async (req, res) => {
+    // owner can delete his property
+    app.delete("/my/properties/:id", verifyToken, verifyOwner, async (req, res) => {
       const { id } = req.params;
       const result = await propertyCollection.deleteOne({
         _id: new ObjectId(id),
@@ -117,8 +245,17 @@ async function run() {
       res.json(result);
     });
 
+    // for admin to show all property
+    app.get("/allProperties", verifyToken, verifyAdmin, async (req, res) => {
+      const cursor = propertyCollection.find();
+      const result = await cursor.toArray();
+      console.log(result);
+      res.json(result);
+    });
+
     // FAVOURITE API
-    app.post("/favourites", async (req, res) => {
+    // tenant can add favourite property
+    app.post("/favourites", verifyToken, verifyTenant, async (req, res) => {
       const favouriteData = req.body;
       const favorite = {
         ...favouriteData,
@@ -128,13 +265,15 @@ async function run() {
       res.json(result);
     });
 
-    app.get("/favourites/:email", async (req, res) => {
+    // tenant can see their own favourite property
+    app.get("/favourites/:email", verifyToken, verifyTenant, async (req, res) => {
       const result = await favouriteCollection
         .find({ userEmail: req.params.email })
         .toArray();
       res.json(result);
     });
 
+    // tenant can delete their own favourite api
     app.delete("/favourites/:id", async (req, res) => {
       const { id } = req.params;
       const result = await favouriteCollection.deleteOne({
@@ -144,12 +283,14 @@ async function run() {
     });
 
     // BOKING RELATED API
+    // tenant can book property by stripe payment gateway
     app.post("/bookings", async (req, res) => {
       const bookingData = req.body;
       const result = await bookingCollection.insertOne(bookingData);
       res.send(result);
     });
 
+    // tenant can see their booking property
     app.get("/bookings", async (req, res) => {
       let query = {};
       if (req.query.userEmail) {
@@ -159,6 +300,7 @@ async function run() {
       res.json(result);
     });
 
+    // after payment booking status changes
     app.patch("/bookings/:id", async (req, res) => {
       const id = req.params.id;
       const result = await bookingCollection.updateOne(
@@ -168,7 +310,17 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/owner/bookings/:id", async (req, res) => {
+     // tenant can see their booking property
+    app.get("/tenantBookings/:userEmail",verifyToken, verifyTenant, async (req, res) => {
+      const userEmail = req.params.userEmail;
+      const result = await bookingCollection
+        .find({ userEmail: userEmail })
+        .toArray();
+      res.json(result);
+    });
+
+    // owner can see people booking their property and owner can approve and reject them
+    app.patch("/owner/bookings/:id", verifyToken, verifyOwner, async (req, res) => {
       const id = req.params.id;
       const updatedBooking = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -177,16 +329,13 @@ async function run() {
           bookingStatus: updatedBooking.bookingStatus,
         },
       };
-      const result = await bookingCollection.updateOne(
-        filter,
-        newlyBookingData,
-      );
-      console.log(result, "rslt");
+      const result = await bookingCollection.updateOne(filter,newlyBookingData);
+      console.log(result, "result");
       res.json(result);
     });
 
     // OWNER BOOKING
-    app.get("/owner/bookings", async (req, res) => {
+    app.get("/owner/bookings", verifyToken, verifyOwner, async (req, res) => {
       let query = {};
       if (req.query.ownerEmail) {
         query.ownerEmail = req.query.ownerEmail;
@@ -195,12 +344,14 @@ async function run() {
       res.json(result);
     });
 
-    app.get("/allBookings", async (req, res) => {
+    // admin can see the all the booking 
+    app.get("/allBookings", verifyToken, verifyAdmin, async (req, res) => {
       const cursor = bookingCollection.find();
       const result = await cursor.toArray();
       console.log(result);
       res.json(result);
     });
+   
 
     // TRANSACTIONS API
     app.post("/transactions", async (req, res) => {
