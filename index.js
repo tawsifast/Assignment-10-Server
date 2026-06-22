@@ -32,7 +32,25 @@ async function run() {
 
     // OWNER PROPERTIES RELATED API
     app.get("/properties", async (req, res) => {
-      const cursor = propertyCollection.find();
+      const { search, type, order } = req.query;
+
+      const query = {};
+
+      if (search) {
+        query.location = { $regex: search, $options: "i" };
+      }
+      if (type && type !== "all") {
+        query.propertyType = type;
+      }
+
+      let cursor = propertyCollection.find(query);
+
+      if (order === "low-to-high") {
+        cursor = cursor.sort({ price: 1 });
+      } else if (order === "high-to-low") {
+        cursor = cursor.sort({ price: -1 });
+      }
+
       const result = await cursor.toArray();
       res.json(result);
     });
@@ -81,6 +99,10 @@ async function run() {
       const updatdProperty = {
         $set: {
           status: changedProperty.status,
+          rejectionReason:
+            changedProperty.status === "Rejected"
+              ? changedProperty.rejectionReason || ""
+              : null,
         },
       };
       const result = await propertyCollection.updateOne(filter, updatdProperty);
@@ -188,7 +210,10 @@ async function run() {
     });
 
     app.get("/transactions", async (req, res) => {
-      const transactions = await transactionCollection.find().sort({ transactionDate: -1 }).toArray();
+      const transactions = await transactionCollection
+        .find()
+        .sort({ transactionDate: -1 })
+        .toArray();
       res.json(transactions);
     });
 
