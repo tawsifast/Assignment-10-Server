@@ -189,6 +189,14 @@ async function run() {
       res.json(result);
     });
 
+    // for features property in homepage
+    app.get("/featuredProperty", async(req, res)=>{
+      const cursor = propertyCollection.find().limit(6);
+      const result = await cursor.toArray();
+      console.log(result);
+      res.json(result);
+    })
+
     // public property details
     app.get("/properties/:id", async (req, res) => {
       const { id } = req.params;
