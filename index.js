@@ -97,7 +97,9 @@ async function run() {
       const autheader = req.headers.authorization;
 
       if (!autheader || !autheader.startsWith("Bearer ")) {
-        return res.status(401).json({ message: "Unauthorized: Missing or Invalid Token Format" });
+        return res
+          .status(401)
+          .json({ message: "Unauthorized: Missing or Invalid Token Format" });
       }
 
       const token = autheader.split(" ")[1];
@@ -106,27 +108,29 @@ async function run() {
       }
 
       try {
-        const query = { token : token };
+        const query = { token: token };
         const session = await sessionCollection.findOne(query);
         if (!session) {
           return res.status(401).send({ message: "unauthorized access" });
         }
-      
+
         const userId = session?.userId;
-  
-        const userQuery = {_id: userId,};
+
+        const userQuery = { _id: userId };
         const user = await userCollection.findOne(userQuery);
-      
+
         if (!user) {
           return res.status(401).send({ message: "unauthorized access" });
         }
-      
+
         req.user = user;
 
         next();
       } catch (error) {
         console.error("Token verification error:", error);
-        return res.status(500).json({ message: "Internal Server Error during verification" });
+        return res
+          .status(500)
+          .json({ message: "Internal Server Error during verification" });
       }
     };
 
@@ -153,9 +157,9 @@ async function run() {
     };
     // ALL THE API IS HERE
 
-    // public api 
+    // public api
     app.get("/properties", async (req, res) => {
-      const { search, type, order } = req.query;
+      const { search, type, order, page} = req.query;
 
       const query = {};
 
@@ -174,6 +178,13 @@ async function run() {
         cursor = cursor.sort({ price: -1 });
       }
 
+      if (page) {
+        const limit = 6;
+        const skip = (parseInt(page) - 1) * limit;
+        const total = await propertyCollection.countDocuments(query);
+        const items = await cursor.skip(skip).limit(limit).toArray();
+        return res.json({ total, items });
+      }
       const result = await cursor.toArray();
       res.json(result);
     });
@@ -207,43 +218,60 @@ async function run() {
       res.json(result || {});
     });
 
-
-    app.patch("/my/properties/:propertyId", verifyToken, verifyOwner, async (req, res) => {
-    const { propertyId } = req.params;
-    const { _id, ...newlyUpdatedData } = req.body; 
-    const result = await propertyCollection.updateOne(
-      { _id: new ObjectId(propertyId) },
-      { $set: newlyUpdatedData },
+    app.patch(
+      "/my/properties/:propertyId",
+      verifyToken,
+      verifyOwner,
+      async (req, res) => {
+        const { propertyId } = req.params;
+        const { _id, ...newlyUpdatedData } = req.body;
+        const result = await propertyCollection.updateOne(
+          { _id: new ObjectId(propertyId) },
+          { $set: newlyUpdatedData },
+        );
+        res.json(result);
+      },
     );
-    res.json(result);
-});
 
     // admin can approve and reject property
-    app.patch("/adminProperty/:id", verifyToken, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const changedProperty = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updatdProperty = {
-        $set: {
-          status: changedProperty.status,
-          rejectionReason:
-            changedProperty.status === "Rejected"
-              ? changedProperty.rejectionReason || ""
-              : null,
-        },
-      };
-      const result = await propertyCollection.updateOne(filter, updatdProperty);
-      res.json(result);
-    });
+    app.patch(
+      "/adminProperty/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const changedProperty = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatdProperty = {
+          $set: {
+            status: changedProperty.status,
+            rejectionReason:
+              changedProperty.status === "Rejected"
+                ? changedProperty.rejectionReason || ""
+                : null,
+          },
+        };
+        const result = await propertyCollection.updateOne(
+          filter,
+          updatdProperty,
+        );
+        res.json(result);
+      },
+    );
 
     // owner can delete his property
-    app.delete("/my/properties/:id", verifyToken, verifyOwner, async (req, res) => {
-      const { id } = req.params;
-      const result = await propertyCollection.deleteOne({
-        _id: new ObjectId(id),
-      });
-      res.json(result);
-    });
+    app.delete(
+      "/my/properties/:id",
+      verifyToken,
+      verifyOwner,
+      async (req, res) => {
+        const { id } = req.params;
+        const result = await propertyCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.json(result);
+      },
+    );
 
     // for admin to show all property
     app.get("/allProperties", verifyToken, verifyAdmin, async (req, res) => {
@@ -266,12 +294,17 @@ async function run() {
     });
 
     // tenant can see their own favourite property
-    app.get("/favourites/:email", verifyToken, verifyTenant, async (req, res) => {
-      const result = await favouriteCollection
-        .find({ userEmail: req.params.email })
-        .toArray();
-      res.json(result);
-    });
+    app.get(
+      "/favourites/:email",
+      verifyToken,
+      verifyTenant,
+      async (req, res) => {
+        const result = await favouriteCollection
+          .find({ userEmail: req.params.email })
+          .toArray();
+        res.json(result);
+      },
+    );
 
     // tenant can delete their own favourite api
     app.delete("/favourites/:id", async (req, res) => {
@@ -310,29 +343,42 @@ async function run() {
       res.send(result);
     });
 
-     // tenant can see their booking property
-    app.get("/tenantBookings/:userEmail",verifyToken, verifyTenant, async (req, res) => {
-      const userEmail = req.params.userEmail;
-      const result = await bookingCollection
-        .find({ userEmail: userEmail })
-        .toArray();
-      res.json(result);
-    });
+    // tenant can see their booking property
+    app.get(
+      "/tenantBookings/:userEmail",
+      verifyToken,
+      verifyTenant,
+      async (req, res) => {
+        const userEmail = req.params.userEmail;
+        const result = await bookingCollection
+          .find({ userEmail: userEmail })
+          .toArray();
+        res.json(result);
+      },
+    );
 
     // owner can see people booking their property and owner can approve and reject them
-    app.patch("/owner/bookings/:id", verifyToken, verifyOwner, async (req, res) => {
-      const id = req.params.id;
-      const updatedBooking = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const newlyBookingData = {
-        $set: {
-          bookingStatus: updatedBooking.bookingStatus,
-        },
-      };
-      const result = await bookingCollection.updateOne(filter,newlyBookingData);
-      console.log(result, "result");
-      res.json(result);
-    });
+    app.patch(
+      "/owner/bookings/:id",
+      verifyToken,
+      verifyOwner,
+      async (req, res) => {
+        const id = req.params.id;
+        const updatedBooking = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const newlyBookingData = {
+          $set: {
+            bookingStatus: updatedBooking.bookingStatus,
+          },
+        };
+        const result = await bookingCollection.updateOne(
+          filter,
+          newlyBookingData,
+        );
+        console.log(result, "result");
+        res.json(result);
+      },
+    );
 
     // OWNER BOOKING
     app.get("/owner/bookings", verifyToken, verifyOwner, async (req, res) => {
@@ -344,14 +390,13 @@ async function run() {
       res.json(result);
     });
 
-    // admin can see the all the booking 
+    // admin can see the all the booking
     app.get("/allBookings", verifyToken, verifyAdmin, async (req, res) => {
       const cursor = bookingCollection.find();
       const result = await cursor.toArray();
       console.log(result);
       res.json(result);
     });
-   
 
     // TRANSACTIONS API
     app.post("/transactions", async (req, res) => {
