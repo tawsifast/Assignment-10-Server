@@ -260,11 +260,7 @@ async function run() {
     );
 
     // owner can delete his property
-    app.delete(
-      "/my/properties/:id",
-      verifyToken,
-      verifyOwner,
-      async (req, res) => {
+    app.delete("/my/properties/:id",async (req, res) => {
         const { id } = req.params;
         const result = await propertyCollection.deleteOne({
           _id: new ObjectId(id),
