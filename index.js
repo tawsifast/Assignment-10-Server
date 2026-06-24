@@ -91,6 +91,7 @@ async function run() {
     const ownerBookingCollection = db.collection("ownerBookings");
     const transactionCollection = db.collection("transactions");
     const sessionCollection = db.collection("session");
+    const reviewCollection = db.collection("reviews");
 
     const verifyToken = async (req, res, next) => {
       console.log("headers", req.headers);
@@ -159,7 +160,7 @@ async function run() {
 
     // public api
     app.get("/properties", async (req, res) => {
-      const { search, type, order, page} = req.query;
+      const { search, type, order, page } = req.query;
 
       const query = {};
 
@@ -190,12 +191,12 @@ async function run() {
     });
 
     // for features property in homepage
-    app.get("/featuredProperty", async(req, res)=>{
+    app.get("/featuredProperty", async (req, res) => {
       const cursor = propertyCollection.find().limit(6);
       const result = await cursor.toArray();
       console.log(result);
       res.json(result);
-    })
+    });
 
     // public property details
     app.get("/properties/:id", async (req, res) => {
@@ -268,14 +269,13 @@ async function run() {
     );
 
     // owner can delete his property
-    app.delete("/my/properties/:id",async (req, res) => {
-        const { id } = req.params;
-        const result = await propertyCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        res.json(result);
-      },
-    );
+    app.delete("/my/properties/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await propertyCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.json(result);
+    });
 
     // for admin to show all property
     app.get("/allProperties", verifyToken, verifyAdmin, async (req, res) => {
@@ -415,6 +415,36 @@ async function run() {
         .sort({ transactionDate: -1 })
         .toArray();
       res.json(transactions);
+    });
+
+    // REVIEW API
+    app.post("/reviews", async (req, res) => {
+      const reviewData = req.body;
+      const review = {
+        ...reviewData,
+        createdAt: new Date(),
+      };
+      const result = await reviewCollection.insertOne(review);
+      res.json(result);
+    });
+
+    // ১. একটি নির্দিষ্ট প্রোপার্টির রিভিউ পাওয়ার জন্য
+    app.get("/reviews/:propertyId", async (req, res) => {
+      const { propertyId } = req.params;
+      const result = await reviewCollection
+        .find({ propertyId: propertyId })
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/home-reviews", async (req, res) => {
+      const result = await reviewCollection
+        .find()
+        .sort({ createdAt: -1 })
+        .limit(4)
+        .toArray();
+      res.send(result);
     });
 
     // USER RELATED API
