@@ -82,7 +82,7 @@ const verifyToken = async (req, res, next) => {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const db = client.db("assignment-10");
     const userCollection = db.collection("user");
     const propertyCollection = db.collection("properties");
@@ -284,6 +284,13 @@ async function run() {
       console.log(result);
       res.json(result);
     });
+    app.delete("/allProperties/:selectedPropertyId", async (req, res) => {
+      const { selectedPropertyId } = req.params;
+      const result = await propertyCollection.deleteOne({
+        _id: new ObjectId(selectedPropertyId),
+      });
+      res.json(result);
+    });
 
     // FAVOURITE API
     // tenant can add favourite property
@@ -457,7 +464,7 @@ async function run() {
       res.json(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
     );
