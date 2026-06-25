@@ -330,6 +330,16 @@ async function run() {
     // tenant can book property by stripe payment gateway
     app.post("/bookings", async (req, res) => {
       const bookingData = req.body;
+      const existingBooking = await bookingCollection.findOne({
+        propertyId: bookingData.propertyId.toString(),
+        userEmail: bookingData.userEmail,
+      });
+
+      if (existingBooking) {
+        return res.status(409).json({
+          message: "Already booked",
+        });
+      }
       const result = await bookingCollection.insertOne(bookingData);
       res.send(result);
     });
