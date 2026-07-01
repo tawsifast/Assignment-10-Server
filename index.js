@@ -473,6 +473,16 @@ async function run() {
 
       res.json(result);
     });
+    // ✅ নতুন PATCH route role update এর জন্য
+    app.patch("/users/:id", async (req, res) => {
+      const { id } = req.params;
+      const { role } = req.body;
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { role } },
+      );
+      res.json(result);
+    });
 
     // await client.db("admin").command({ ping: 1 });
     console.log(
